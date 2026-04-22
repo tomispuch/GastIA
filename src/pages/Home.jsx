@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -8,7 +8,7 @@ import { useGamificacion } from '../context/GamificacionContext'
 const MOCK_RESPONSE = {
   ok: true,
   tipo: 'gasto',
-  registro: { monto: 1500, categoria: 'Comida y bebida', fecha: new Date().toISOString().split('T')[0], descripcion: 'Almuerzo' },
+  registro: { monto: 1500, categoria: 'Comida y bebida', descripcion: 'Almuerzo' },
   alerta: null,
 }
 const speechSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
@@ -18,20 +18,23 @@ function fmt(n) { return '$' + Number(n).toLocaleString('es-AR') }
 function getMonthRange() {
   const now = new Date()
   const y = now.getFullYear(), m = now.getMonth() + 1
-  const from = `${y}-${String(m).padStart(2,'0')}-01`
-  const to = `${y}-${String(m).padStart(2,'0')}-${new Date(y, m, 0).getDate()}`
-  return { from, to }
+  return {
+    from: `${y}-${String(m).padStart(2,'0')}-01`,
+    to: `${y}-${String(m).padStart(2,'0')}-${new Date(y, m, 0).getDate()}`,
+  }
 }
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const ACCIONES = [
-  { to: '/historial',     label: 'Historial',     desc: 'Todos tus movimientos',         icon: '📋', plans: ['gratis','pro'], color: '#3B82F6' },
-  { to: '/dashboard',     label: 'Dashboard',     desc: 'Gráficos del mes',              icon: '📊', plans: ['pro'],          color: '#8B5CF6' },
-  { to: '/presupuestos',  label: 'Presupuestos',  desc: 'Límites por categoría',         icon: '🎯', plans: ['pro'],          color: '#F59E0B' },
-  { to: '/comparativa',   label: 'Comparar',      desc: 'Compará dos meses',             icon: '📈', plans: ['pro'],          color: '#10B981' },
-  { to: '/deudas',        label: 'Deudas',        desc: 'Lo que debés y te deben',       icon: '🤝', plans: ['gratis','pro'], color: '#EC4899' },
-  { to: '/logros',        label: 'Logros',        desc: 'Tu progreso y nivel',           icon: '🏆', plans: ['gratis','pro'], color: '#F97316' },
+  { to: '/historial',     label: 'Historial',     desc: 'Todos tus movimientos',       icon: '📋', plans: ['gratis','pro'], color: '#3B82F6' },
+  { to: '/dashboard',     label: 'Dashboard',     desc: 'Gráficos del mes',            icon: '📊', plans: ['pro'],          color: '#8B5CF6' },
+  { to: '/presupuestos',  label: 'Presupuestos',  desc: 'Límites por categoría',       icon: '🎯', plans: ['pro'],          color: '#F59E0B' },
+  { to: '/comparativa',   label: 'Comparar',      desc: 'Compará dos meses',           icon: '📈', plans: ['pro'],          color: '#10B981' },
+  { to: '/cuentas',       label: 'Cuentas',       desc: 'Tus billeteras y tarjetas',   icon: '💳', plans: ['pro'],          color: '#FA133A' },
+  { to: '/deudas',        label: 'Deudas',        desc: 'Lo que debés y te deben',     icon: '🤝', plans: ['gratis','pro'], color: '#EC4899' },
+  { to: '/logros',        label: 'Logros',        desc: 'Tu progreso y nivel',         icon: '🏆', plans: ['gratis','pro'], color: '#F97316' },
+  { to: '/configuracion', label: 'Config',        desc: 'Ajustá tu cuenta',            icon: '⚙️', plans: ['gratis','pro'], color: '#6B7280' },
 ]
 
 export default function Home() {
@@ -40,12 +43,12 @@ export default function Home() {
   const { nivel, racha, logrosDesbloqueados, verificarPrimerGasto } = useGamificacion()
   const navigate = useNavigate()
 
-  // Resumen
   const [totalGastos, setTotalGastos] = useState(0)
   const [totalIngresos, setTotalIngresos] = useState(0)
   const [resumenLoading, setResumenLoading] = useState(true)
+  const [cuentas, setCuentas] = useState([])
+  const [cuentaId, setCuentaId] = useState('')
 
-  // Formulario de carga
   const [texto, setTexto] = useState('')
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [listening, setListening] = useState(false)
@@ -56,22 +59,41 @@ export default function Home() {
 
   const now = new Date()
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!user) return
-    fetchResumen()
-  }, [user])
-
-  async function fetchResumen() {
     setResumenLoading(true)
     const { from, to } = getMonthRange()
-    const [gRes, iRes] = await Promise.all([
+    const [gRes, iRes, cRes] = await Promise.all([
       supabase.from('gastos').select('monto').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
       supabase.from('ingresos').select('monto').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
+      supabase.from('cuentas').select('*').eq('user_id', user.id).order('created_at'),
     ])
     setTotalGastos((gRes.data || []).reduce((a, g) => a + Number(g.monto), 0))
     setTotalIngresos((iRes.data || []).reduce((a, i) => a + Number(i.monto), 0))
+
+    if (cRes.data?.length) {
+      // calcular balances
+      const ids = cRes.data.map(c => c.id)
+      const [gastosAll, ingresosAll, transOri, transDest] = await Promise.all([
+        supabase.from('gastos').select('cuenta_id, monto').eq('user_id', user.id),
+        supabase.from('ingresos').select('cuenta_id, monto').eq('user_id', user.id),
+        supabase.from('transferencias').select('cuenta_origen_id, monto').eq('user_id', user.id),
+        supabase.from('transferencias').select('cuenta_destino_id, monto').eq('user_id', user.id),
+      ])
+      const balances = {}
+      for (const c of cRes.data) balances[c.id] = Number(c.saldo_inicial)
+      for (const g of (gastosAll.data || [])) if (balances[g.cuenta_id] !== undefined) balances[g.cuenta_id] -= Number(g.monto)
+      for (const i of (ingresosAll.data || [])) if (balances[i.cuenta_id] !== undefined) balances[i.cuenta_id] += Number(i.monto)
+      for (const t of (transOri.data || [])) if (balances[t.cuenta_origen_id] !== undefined) balances[t.cuenta_origen_id] -= Number(t.monto)
+      for (const t of (transDest.data || [])) if (balances[t.cuenta_destino_id] !== undefined) balances[t.cuenta_destino_id] += Number(t.monto)
+      const cuentasConBalance = cRes.data.map(c => ({ ...c, balance: balances[c.id] }))
+      setCuentas(cuentasConBalance)
+      if (!cuentaId) setCuentaId(cuentasConBalance[0]?.id || '')
+    }
     setResumenLoading(false)
-  }
+  }, [user])
+
+  useEffect(() => { fetchData() }, [fetchData])
 
   function startVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -81,8 +103,7 @@ export default function Home() {
     r.onresult = (e) => setTexto(Array.from(e.results).map(r => r[0].transcript).join(''))
     r.onend = () => setListening(false)
     r.onerror = () => setListening(false)
-    recognitionRef.current = r
-    r.start()
+    recognitionRef.current = r; r.start()
   }
   function stopVoice() { recognitionRef.current?.stop(); setListening(false) }
 
@@ -95,24 +116,34 @@ export default function Home() {
       let data
       if (!webhookUrl || webhookUrl.includes('placeholder')) {
         await new Promise(r => setTimeout(r, 900))
-        data = { ...MOCK_RESPONSE, registro: { ...MOCK_RESPONSE.registro, fecha } }
+        const reg = { ...MOCK_RESPONSE.registro, fecha }
+        // Guardar en Supabase en modo mock
+        await supabase.from('gastos').insert({
+          user_id: user.id, monto: reg.monto, categoria: reg.categoria,
+          fecha: reg.fecha, descripcion: reg.descripcion, cuenta_id: cuentaId || null,
+        })
+        data = { ok: true, tipo: MOCK_RESPONSE.tipo, registro: reg, alerta: null }
       } else {
         const res = await fetch(webhookUrl, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texto, user_id: user.id, fecha }),
+          body: JSON.stringify({ texto, user_id: user.id, fecha, cuenta_id: cuentaId }),
         })
         data = await res.json()
       }
       setResultado(data)
-      if (data.ok) { verificarPrimerGasto(); fetchResumen() }
+      if (data.ok) { verificarPrimerGasto(); fetchData() }
     } catch { setFormError('Error al conectar. Intentá de nuevo.') }
     finally { setFormLoading(false) }
   }
 
-  function resetForm() { setTexto(''); setResultado(null); setFormError(''); setFecha(new Date().toISOString().split('T')[0]) }
+  function resetForm() {
+    setTexto(''); setResultado(null); setFormError('')
+    setFecha(new Date().toISOString().split('T')[0])
+  }
 
   const balance = totalIngresos - totalGastos
   const nombreUsuario = user?.user_metadata?.nombre || user?.email?.split('@')[0] || 'Usuario'
+  const mostrarSelectorCuenta = plan === 'pro' && cuentas.length > 1
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -152,7 +183,32 @@ export default function Home() {
         )}
       </div>
 
-      {/* Formulario de carga inline */}
+      {/* Cards de cuentas — solo Pro */}
+      {plan === 'pro' && cuentas.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-[#070708]/50 uppercase tracking-widest">Cuentas</p>
+            <button onClick={() => navigate('/cuentas')} className="text-xs text-[#FA133A] font-semibold">
+              Gestionar →
+            </button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {cuentas.map(c => (
+              <div key={c.id} className="card-dark p-3.5 flex-shrink-0 min-w-[140px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">{c.icono}</span>
+                  <p className="text-white/60 text-xs font-medium truncate">{c.nombre}</p>
+                </div>
+                <p className={`font-black text-base ${c.balance >= 0 ? 'text-white' : 'text-[#FA133A]'}`}>
+                  {fmt(c.balance || 0)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Formulario de carga */}
       <div className="card-dark p-5">
         <p className="text-white font-bold text-sm mb-4">➕ Cargar movimiento</p>
 
@@ -167,43 +223,43 @@ export default function Home() {
                 className="input-dark resize-none pr-14 w-full"
               />
               {speechSupported && (
-                <button
-                  type="button"
-                  onClick={listening ? stopVoice : startVoice}
+                <button type="button" onClick={listening ? stopVoice : startVoice}
                   className={`absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full flex items-center justify-center transition-all text-base ${
                     listening
                       ? 'bg-[#FA133A] text-white shadow-[0_0_20px_rgba(250,19,58,0.5)] animate-pulse'
                       : 'bg-white/10 hover:bg-white/20 text-white/60'
                   }`}
-                >
-                  🎤
-                </button>
+                >🎤</button>
               )}
             </div>
             {listening && <p className="text-xs text-[#FA133A] animate-pulse font-medium">● Escuchando...</p>}
 
-            <div className="flex gap-2 items-center">
-              <input
-                type="date"
-                value={fecha}
-                onChange={e => setFecha(e.target.value)}
-                className="input-dark flex-1 text-sm py-2"
-              />
-              <button
-                type="submit"
-                disabled={formLoading || !texto.trim()}
-                className="btn-red px-5 py-2 text-sm flex-shrink-0"
-              >
-                {formLoading
-                  ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Procesando...</span>
-                  : 'Registrar'
-                }
-              </button>
+            <div className="flex gap-2">
+              <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+                className="input-dark text-sm py-2 flex-1" />
+              {mostrarSelectorCuenta && (
+                <select value={cuentaId} onChange={e => setCuentaId(e.target.value)}
+                  className="select-dark flex-1">
+                  {cuentas.map(c => (
+                    <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {formError && (
               <p className="text-xs text-[#FA133A] bg-[#FA133A]/10 px-3 py-2 rounded-xl">{formError}</p>
             )}
+
+            <button type="submit" disabled={formLoading || !texto.trim()} className="btn-red w-full py-3 text-sm">
+              {formLoading
+                ? <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Procesando...
+                  </span>
+                : 'Registrar'
+              }
+            </button>
           </form>
         ) : (
           resultado.ok ? (
@@ -227,9 +283,7 @@ export default function Home() {
               {resultado.alerta && (
                 <p className="text-xs text-yellow-400 bg-yellow-500/10 px-3 py-2 rounded-xl">{resultado.alerta.mensaje}</p>
               )}
-              <button onClick={resetForm} className="btn-red w-full py-2.5 text-sm">
-                Cargar otro
-              </button>
+              <button onClick={resetForm} className="btn-red w-full py-2.5 text-sm">Cargar otro</button>
             </div>
           ) : (
             <div className="space-y-3 text-center">
@@ -252,9 +306,7 @@ export default function Home() {
               <span className="text-white text-sm">🏅 <span className="font-bold">{logrosDesbloqueados.length}</span> <span className="text-white/40 text-xs">logros</span></span>
             </div>
           </div>
-          <button onClick={() => navigate('/logros')} className="text-xs text-[#FA133A] font-semibold flex-shrink-0">
-            Ver →
-          </button>
+          <button onClick={() => navigate('/logros')} className="text-xs text-[#FA133A] font-semibold flex-shrink-0">Ver →</button>
         </div>
       )}
 
@@ -265,8 +317,7 @@ export default function Home() {
           {ACCIONES.map(accion => {
             const disponible = accion.plans.includes(plan)
             return (
-              <button
-                key={accion.to}
+              <button key={accion.to}
                 onClick={() => disponible && navigate(accion.to)}
                 className={`card-dark p-4 text-left transition-all ${
                   disponible ? 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer' : 'opacity-40 cursor-not-allowed'
@@ -277,9 +328,7 @@ export default function Home() {
                     style={{ background: accion.color + '22' }}>
                     {accion.icon}
                   </div>
-                  {!disponible && (
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-white/40">PRO</span>
-                  )}
+                  {!disponible && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-white/40">PRO</span>}
                 </div>
                 <p className="text-white font-bold text-sm">{accion.label}</p>
                 <p className="text-white/40 text-xs mt-0.5 leading-snug">{accion.desc}</p>

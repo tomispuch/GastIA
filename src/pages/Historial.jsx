@@ -26,7 +26,9 @@ export default function Historial() {
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [anio, setAnio] = useState(now.getFullYear())
   const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroCuenta, setFiltroCuenta] = useState('')
   const [movimientos, setMovimientos] = useState([])
+  const [cuentas, setCuentas] = useState([])
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -34,15 +36,24 @@ export default function Historial() {
   useEffect(() => {
     if (!user || !plan) return
     fetchMovimientos()
-  }, [user, plan, mes, anio, filtroCategoria])
+  }, [user, plan, mes, anio, filtroCategoria, filtroCuenta])
+
+  useEffect(() => {
+    if (!user || plan !== 'pro') return
+    supabase.from('cuentas').select('id, nombre, icono').eq('user_id', user.id).order('created_at')
+      .then(({ data }) => setCuentas(data || []))
+  }, [user, plan])
 
   async function fetchMovimientos() {
     setLoading(true)
     const { from, to } = getMonthRange(anio, mes)
-    const [gastosRes, ingresosRes] = await Promise.all([
-      supabase.from('gastos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to).order('fecha', { ascending: false }),
-      supabase.from('ingresos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to).order('fecha', { ascending: false }),
-    ])
+    let gastosQ = supabase.from('gastos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to).order('fecha', { ascending: false })
+    let ingresosQ = supabase.from('ingresos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to).order('fecha', { ascending: false })
+    if (filtroCuenta) {
+      gastosQ = gastosQ.eq('cuenta_id', filtroCuenta)
+      ingresosQ = ingresosQ.eq('cuenta_id', filtroCuenta)
+    }
+    const [gastosRes, ingresosRes] = await Promise.all([gastosQ, ingresosQ])
     let items = [
       ...(gastosRes.data || []).map(g => ({ ...g, _tipo: 'gasto' })),
       ...(ingresosRes.data || []).map(i => ({ ...i, _tipo: 'ingreso' })),
@@ -89,6 +100,12 @@ export default function Historial() {
           <option value="">Todas las categorías</option>
           {[...CATEGORIAS_GASTO, ...CATEGORIAS_INGRESO].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        {plan === 'pro' && cuentas.length > 1 && (
+          <select value={filtroCuenta} onChange={e => setFiltroCuenta(e.target.value)} className="select-light text-xs">
+            <option value="">Todas las cuentas</option>
+            {cuentas.map(c => <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Summary */}
@@ -135,9 +152,13 @@ export default function Historial() {
                   <span className="text-white text-sm font-semibold truncate">{item.descripcion || item.categoria}</span>
                   {item.recurrente && <span className="text-xs text-white/40">🔁</span>}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-white/40 text-xs">{item.fecha}</span>
                   <span className="text-xs bg-white/20 text-white/70 rounded px-1.5 py-0.5">{item.categoria}</span>
+                  {item.cuenta_id && cuentas.length > 0 && (() => {
+                    const c = cuentas.find(c => c.id === item.cuenta_id)
+                    return c ? <span className="text-xs text-white/40">{c.icono} {c.nombre}</span> : null
+                  })()}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">

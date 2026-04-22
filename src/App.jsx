@@ -11,6 +11,7 @@ import Configuracion from './pages/Configuracion'
 import Deudas from './pages/Deudas'
 import Comparativa from './pages/Comparativa'
 import Logros from './pages/Logros'
+import Cuentas from './pages/Cuentas'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/historial" element={<Historial />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/presupuestos" element={<Presupuestos />} />
+          <Route path="/cuentas" element={<Cuentas />} />
           <Route path="/deudas" element={<Deudas />} />
           <Route path="/comparativa" element={<Comparativa />} />
           <Route path="/logros" element={<Logros />} />
