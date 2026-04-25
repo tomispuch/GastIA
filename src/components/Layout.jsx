@@ -16,6 +16,7 @@ const navItems = [
   { to: '/deudas',        label: 'Deudas',        icon: '🤝', plans: ['gratis', 'pro'] },
   { to: '/logros',        label: 'Logros',        icon: '🏆', plans: ['gratis', 'pro'] },
   { to: '/configuracion', label: 'Config',        icon: '⚙️', plans: ['gratis', 'pro'] },
+  { to: '/soporte',       label: 'Soporte',       icon: '💬', plans: ['gratis', 'pro'] },
 ]
 
 export default function Layout() {
@@ -36,11 +37,11 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#D6D7D7] flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: '#D6D7D7' }}>
 
       {/* ── HEADER ── */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#070708]"
-        style={{ boxShadow: '0 1px 0 rgba(255,255,255,0.06)' }}>
+      <header className="fixed top-0 left-0 right-0 z-50"
+        style={{ background: 'rgba(7,7,8,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: '0 1px 0 rgba(255,255,255,0.05)' }}>
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 md:px-6 h-12">
@@ -74,15 +75,17 @@ export default function Layout() {
         </div>
 
         {/* Desktop nav tabs */}
-        <div className="hidden md:flex overflow-x-auto border-t border-white/[0.06]"
-          style={{ scrollbarWidth: 'none' }}>
+        <div className="hidden md:flex items-center overflow-x-auto border-t gap-0.5 px-2"
+          style={{ borderColor: 'rgba(255,255,255,0.05)', scrollbarWidth: 'none' }}>
           {navItems.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                  isActive ? 'border-[#FA133A] text-white' : 'border-transparent text-white/40 hover:text-white/70'
+                `flex-shrink-0 flex items-center gap-1.5 px-3 py-2 my-1 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                  isActive
+                    ? 'bg-[#FA133A]/20 text-[#FA133A]'
+                    : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                 }`
               }
             >

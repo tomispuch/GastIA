@@ -16,15 +16,15 @@ body {
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #c0c0c0; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
 
 /* Card base */
 .card {
   background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  border-radius: 22px;
+  border: 1px solid rgba(0,0,0,0.06);
 }
 
 /* Gradient accent background */
@@ -34,16 +34,16 @@ body {
 
 /* Red glow button */
 .btn-red {
-  background: #FA133A;
+  background: linear-gradient(135deg, #FF1F44 0%, #FA133A 100%);
   color: white;
   border-radius: 12px;
   font-weight: 700;
   transition: all 0.2s;
-  box-shadow: 0 4px 14px rgba(250, 19, 58, 0.35);
+  box-shadow: 0 4px 16px rgba(250, 19, 58, 0.4), 0 1px 3px rgba(250, 19, 58, 0.3);
 }
 .btn-red:hover {
-  background: #e0102f;
-  box-shadow: 0 6px 20px rgba(250, 19, 58, 0.45);
+  background: linear-gradient(135deg, #FF2B4E 0%, #E8102F 100%);
+  box-shadow: 0 8px 28px rgba(250, 19, 58, 0.55), 0 2px 6px rgba(250, 19, 58, 0.3);
   transform: translateY(-1px);
 }
 .btn-red:active {
@@ -58,13 +58,13 @@ body {
 /* Input base */
 .input-base {
   width: 100%;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.1);
+  border-radius: 12px;
   padding: 10px 14px;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  background: #fafafa;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  background: rgba(255,255,255,0.8);
 }
 .input-base:focus {
   border-color: #FA133A;
@@ -74,21 +74,22 @@ body {
 
 /* Dark card */
 .card-dark {
-  background: #070708;
-  border-radius: 16px;
+  background: linear-gradient(145deg, #18191c 0%, #0a0b0c 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 22px;
   color: white;
 }
 
 /* Dark input (for dark card contexts) */
 .input-dark {
   width: 100%;
-  border: 1.5px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
   padding: 10px 14px;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  background: rgba(255,255,255,0.05);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  background: rgba(255,255,255,0.04);
   color: white;
 }
 .input-dark::placeholder { color: rgba(255,255,255,0.25); }
@@ -100,8 +101,8 @@ body {
 
 /* Select light (for use on the grey page background) */
 .select-light {
-  border: 1.5px solid rgba(7,7,8,0.15);
-  border-radius: 10px;
+  border: 1.5px solid rgba(7,7,8,0.1);
+  border-radius: 12px;
   padding: 7px 12px;
   font-size: 13px;
   outline: none;
@@ -117,8 +118,8 @@ body {
 
 /* Select dark */
 .select-dark {
-  border: 1.5px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
   padding: 8px 12px;
   font-size: 13px;
   outline: none;

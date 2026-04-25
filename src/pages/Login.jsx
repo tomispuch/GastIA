@@ -18,7 +18,7 @@ export default function Login() {
     if (error) {
       setError('Email o contraseña incorrectos.')
     } else {
-      navigate('/')
+      navigate('/home')
     }
   }
 
@@ -57,7 +57,15 @@ export default function Login() {
       </div>
 
       {/* Panel derecho — form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative">
+
+        {/* Volver a la landing */}
+        <Link to="/" className="absolute top-6 left-6 flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#FA133A] transition-colors font-medium">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          Volver
+        </Link>
 
         {/* Logo mobile */}
         <div className="lg:hidden mb-8 text-center">
