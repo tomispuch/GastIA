@@ -29,7 +29,7 @@ export default function Configuracion() {
     e.preventDefault()
     setPwError('')
     setPwSuccess(false)
-    if (newPassword.length < 6) { setPwError('La contraseña debe tener al menos 6 caracteres.'); return }
+    if (newPassword.length < 8) { setPwError('La contraseña debe tener al menos 8 caracteres.'); return }
     setPwLoading(true)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setPwLoading(false)
@@ -87,7 +87,8 @@ export default function Configuracion() {
             value={newPassword}
             onChange={e => setNewPassword(e.target.value)}
             placeholder="Nueva contraseña"
-            minLength={6}
+            minLength={8}
+            maxLength={128}
             className="input-dark"
           />
           {pwError && <p className="text-xs text-[#FA133A]">{pwError}</p>}
@@ -122,6 +123,7 @@ export default function Configuracion() {
             value={nuevaCategoria}
             onChange={e => setNuevaCategoria(e.target.value)}
             placeholder="Nueva categoría"
+            maxLength={40}
             className="input-dark flex-1"
           />
           <button

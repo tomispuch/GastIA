@@ -129,6 +129,7 @@ export default function Soporte() {
                 value={descripcion}
                 onChange={e => setDescripcion(e.target.value)}
                 rows={5}
+                maxLength={1000}
                 className="input-dark resize-none"
                 placeholder="Describí lo que pasó con el mayor detalle posible. ¿Qué intentabas hacer? ¿Qué viste en pantalla?"
               />

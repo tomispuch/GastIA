@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { isValidEmail } from '../lib/validate'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -12,8 +13,17 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    const emailTrimmed = email.trim()
+    if (!isValidEmail(emailTrimmed)) {
+      setError('Ingresá un email válido.')
+      return
+    }
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({ email: emailTrimmed, password })
     setLoading(false)
     if (error) {
       setError('Email o contraseña incorrectos.')

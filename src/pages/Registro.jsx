@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { isValidEmail, isValidPassword, sanitizeName } from '../lib/validate'
 
 export default function Registro() {
   const [nombre, setNombre] = useState('')
@@ -13,12 +14,29 @@ export default function Registro() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+
+    const nombreSanitized = sanitizeName(nombre)
+    const emailTrimmed = email.trim()
+
+    if (nombreSanitized.length < 2) {
+      setError('El nombre debe tener al menos 2 caracteres.')
+      return
+    }
+    if (!isValidEmail(emailTrimmed)) {
+      setError('Ingresá un email válido.')
+      return
+    }
+    if (!isValidPassword(password)) {
+      setError('La contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+
     setLoading(true)
 
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
+      email: emailTrimmed,
       password,
-      options: { data: { nombre } },
+      options: { data: { nombre: nombreSanitized } },
     })
 
     if (signUpError) {
@@ -116,6 +134,7 @@ export default function Registro() {
                   <input
                     type="text"
                     required
+                    maxLength={50}
                     value={nombre}
                     onChange={e => setNombre(e.target.value)}
                     className="input-base"
@@ -140,11 +159,11 @@ export default function Registro() {
                   <input
                     type="password"
                     required
-                    minLength={6}
+                    minLength={8}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     className="input-base"
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mínimo 8 caracteres"
                   />
                 </div>
 

@@ -107,9 +107,25 @@ export default function Home() {
   }
   function stopVoice() { recognitionRef.current?.stop(); setListening(false) }
 
+  const lastSubmitRef = useRef(0)
+  const MAX_TEXTO = 500
+
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!texto.trim()) return
+    const textoTrimmed = texto.trim()
+    if (!textoTrimmed) return
+
+    const ahora = Date.now()
+    if (ahora - lastSubmitRef.current < 10_000) {
+      setFormError('Esperá unos segundos antes de registrar otro movimiento.')
+      return
+    }
+    if (textoTrimmed.length > MAX_TEXTO) {
+      setFormError(`El texto no puede superar los ${MAX_TEXTO} caracteres.`)
+      return
+    }
+
+    lastSubmitRef.current = ahora
     setFormError(''); setFormLoading(true); setResultado(null)
     try {
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL
@@ -219,6 +235,7 @@ export default function Home() {
                 value={texto}
                 onChange={e => setTexto(e.target.value)}
                 rows={3}
+                maxLength={500}
                 placeholder='"Gasté 1500 en el almuerzo" o "Cobré el sueldo de 80000"'
                 className="input-dark resize-none pr-14 w-full"
               />

@@ -218,7 +218,7 @@ function FormDeuda({ onClose, onSave, tabInicial }) {
             <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
               {tipo === 'debo' ? '¿A quién le debés?' : '¿Quién te debe?'}
             </label>
-            <input type="text" required value={persona} onChange={e => setPersona(e.target.value)}
+            <input type="text" required maxLength={100} value={persona} onChange={e => setPersona(e.target.value)}
               placeholder="Nombre de la persona" className="input-dark" />
           </div>
 
@@ -230,7 +230,7 @@ function FormDeuda({ onClose, onSave, tabInicial }) {
 
           <div>
             <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">Descripción (opcional)</label>
-            <input type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)}
+            <input type="text" maxLength={200} value={descripcion} onChange={e => setDescripcion(e.target.value)}
               placeholder="Ej: préstamo del viernes" className="input-dark" />
           </div>
 
