@@ -57,13 +57,13 @@ export default function Login() {
         </div>
 
         {/* TRS abajo */}
-        <div className="flex items-center gap-3">
-          <img src="/Logo-trs.png" alt="TRS" className="h-8 w-auto opacity-60 max-w-[80px] object-contain" onError={e => e.target.style.display='none'} />
+        <a href="https://trs-automatizaciones.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
+          <img src="/Logo-trs.png" alt="TRS" className="h-8 w-auto opacity-60 hover:opacity-90 transition-opacity max-w-[80px] object-contain" onError={e => e.target.style.display='none'} />
           <div>
             <p className="text-white/30 text-xs font-medium">Desarrollado por</p>
             <p className="text-white/60 text-sm font-semibold">TRS Automatizaciones</p>
           </div>
-        </div>
+        </a>
       </div>
 
       {/* Panel derecho — form */}
@@ -143,10 +143,11 @@ export default function Login() {
           </form>
 
           {/* Mobile TRS credit */}
-          <div className="lg:hidden mt-12 flex items-center justify-center gap-2 opacity-50">
+          <a href="https://trs-automatizaciones.vercel.app/" target="_blank" rel="noopener noreferrer"
+            className="lg:hidden mt-12 flex items-center justify-center gap-2 opacity-50 hover:opacity-80 transition-opacity">
             <img src="/Logo-trs.png" alt="TRS" className="h-5 w-auto max-w-[50px] object-contain" onError={e => e.target.style.display='none'} />
             <span className="text-xs text-gray-500">TRS Automatizaciones</span>
-          </div>
+          </a>
         </div>
       </div>
     </div>

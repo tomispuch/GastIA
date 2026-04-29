@@ -78,13 +78,13 @@ export default function Registro() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <img src="/Logo-trs.png" alt="TRS" className="h-8 w-auto opacity-60 max-w-[80px] object-contain" onError={e => e.target.style.display='none'} />
+        <a href="https://trs-automatizaciones.vercel.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3">
+          <img src="/Logo-trs.png" alt="TRS" className="h-8 w-auto opacity-60 hover:opacity-90 transition-opacity max-w-[80px] object-contain" onError={e => e.target.style.display='none'} />
           <div>
             <p className="text-white/30 text-xs font-medium">Desarrollado por</p>
             <p className="text-white/60 text-sm font-semibold">TRS Automatizaciones</p>
           </div>
-        </div>
+        </a>
       </div>
 
       {/* Panel derecho */}

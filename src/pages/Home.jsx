@@ -102,7 +102,16 @@ export default function Home() {
     r.onstart = () => setListening(true)
     r.onresult = (e) => setTexto(Array.from(e.results).map(r => r[0].transcript).join(''))
     r.onend = () => setListening(false)
-    r.onerror = () => setListening(false)
+    r.onerror = (e) => {
+      setListening(false)
+      if (e.error === 'not-allowed') {
+        setFormError('Permiso de micrófono denegado. Habilitalo en la configuración del navegador.')
+      } else if (e.error === 'audio-capture') {
+        setFormError('No se encontró micrófono. Verificá que esté conectado y sin uso por otra app.')
+      } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+        setFormError('No se pudo usar el micrófono. Intentá con Chrome o Edge.')
+      }
+    }
     recognitionRef.current = r; r.start()
   }
   function stopVoice() { recognitionRef.current?.stop(); setListening(false) }

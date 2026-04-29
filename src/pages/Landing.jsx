@@ -621,7 +621,9 @@ export default function Landing() {
       <footer className="px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4"
         style={{ borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)' }}>
         <div className="flex items-center gap-3">
-          <img src="/Logo-trs.png" alt="TRS" className="h-6 w-auto opacity-30 object-contain" onError={e => e.target.style.display = 'none'} />
+          <a href="https://trs-automatizaciones.vercel.app/" target="_blank" rel="noopener noreferrer">
+            <img src="/Logo-trs.png" alt="TRS" className="h-6 w-auto opacity-30 hover:opacity-60 transition-opacity object-contain" onError={e => e.target.style.display = 'none'} />
+          </a>
           <span className="text-xs">TRS Automatizaciones · Menos tareas, más resultados.</span>
         </div>
         <div className="flex items-center gap-5 text-xs">

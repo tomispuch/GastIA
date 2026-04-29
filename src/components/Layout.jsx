@@ -177,12 +177,14 @@ export default function Layout() {
         {/* TRS credit — aparece al pie de todas las páginas */}
         <div className="flex flex-col items-center gap-3 py-8 mt-4">
           <p className="text-[#070708]/30 text-xs uppercase tracking-widest font-semibold">Desarrollado por</p>
-          <img
-            src="/Logo-trs.png"
-            alt="TRS Automatizaciones"
-            className="h-10 w-auto max-w-[160px] object-contain opacity-50 hover:opacity-80 transition-opacity"
-            onError={e => { e.target.style.display = 'none' }}
-          />
+          <a href="https://trs-automatizaciones.vercel.app/" target="_blank" rel="noopener noreferrer">
+            <img
+              src="/Logo-trs.png"
+              alt="TRS Automatizaciones"
+              className="h-10 w-auto max-w-[160px] object-contain opacity-50 hover:opacity-80 transition-opacity"
+              onError={e => { e.target.style.display = 'none' }}
+            />
+          </a>
           <p className="text-[#070708]/40 text-xs font-medium">TRS Automatizaciones</p>
         </div>
       </main>
