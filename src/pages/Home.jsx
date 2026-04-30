@@ -157,15 +157,34 @@ export default function Home() {
         })
         data = { ok: true, tipo: MOCK_RESPONSE.tipo, registro: reg, alerta: null }
       } else {
-        const res = await fetch(webhookUrl, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texto, user_id: user.id, fecha, cuenta_id: cuentaId }),
-        })
-        data = await res.json()
+        let res
+        try {
+          res = await fetch(webhookUrl, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texto, user_id: user.id, fecha, cuenta_id: cuentaId }),
+          })
+        } catch {
+          // El fetch en sí falló — CORS bloqueado, N8N inaccesible, sin red
+          setFormError('No se pudo conectar con el servidor. Verificá tu conexión o que N8N esté activo.')
+          setFormLoading(false)
+          return
+        }
+        if (!res.ok) {
+          setFormError(`Error del servidor (${res.status}). Revisá que el workflow de N8N esté activo.`)
+          setFormLoading(false)
+          return
+        }
+        try {
+          data = await res.json()
+        } catch {
+          setFormError('N8N respondió con un formato inesperado. Revisá el nodo "Respond to Webhook".')
+          setFormLoading(false)
+          return
+        }
       }
       setResultado(data)
       if (data.ok) { verificarPrimerGasto(); fetchData() }
-    } catch { setFormError('Error al conectar. Intentá de nuevo.') }
+    } catch { setFormError('Error inesperado. Intentá de nuevo.') }
     finally { setFormLoading(false) }
   }
 

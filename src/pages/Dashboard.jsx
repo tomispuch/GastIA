@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis,
+} from 'recharts'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { usePlan } from '../hooks/usePlan'
@@ -13,6 +16,13 @@ function fmt(n) {
   return '$' + Number(n).toLocaleString('es-AR')
 }
 
+function fmtShort(n) {
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M'
+  if (abs >= 1_000)     return '$' + (n / 1_000).toFixed(0) + 'k'
+  return '$' + n
+}
+
 function getMonthRange(year, month) {
   const from = `${year}-${String(month).padStart(2,'0')}-01`
   const lastDay = new Date(year, month, 0).getDate()
@@ -22,20 +32,110 @@ function getMonthRange(year, month) {
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+// Calcula la evolución diaria de saldos para el mes dado
+function computeEvolucion(cuentasData, gastosHist, ingresosHist, anio, mes) {
+  const diasEnMes = new Date(anio, mes, 0).getDate()
+  const padMes = String(mes).padStart(2, '0')
+  const fechaInicioMes = `${anio}-${padMes}-01`
+
+  // Saldo inicial de cada cuenta
+  const balances = {}
+  for (const c of cuentasData) balances[c.id] = Number(c.saldo_inicial)
+
+  // Agrupar movimientos: los anteriores al mes se acumulan directo,
+  // los del mes se indexan por fecha
+  const movsByDate = {}
+
+  for (const g of gastosHist) {
+    if (g.fecha < fechaInicioMes) {
+      if (balances[g.cuenta_id] !== undefined) balances[g.cuenta_id] -= Number(g.monto)
+    } else {
+      if (!movsByDate[g.fecha]) movsByDate[g.fecha] = []
+      movsByDate[g.fecha].push({ cuenta_id: g.cuenta_id, delta: -Number(g.monto) })
+    }
+  }
+  for (const i of ingresosHist) {
+    if (i.fecha < fechaInicioMes) {
+      if (balances[i.cuenta_id] !== undefined) balances[i.cuenta_id] += Number(i.monto)
+    } else {
+      if (!movsByDate[i.fecha]) movsByDate[i.fecha] = []
+      movsByDate[i.fecha].push({ cuenta_id: i.cuenta_id, delta: Number(i.monto) })
+    }
+  }
+
+  const current = { ...balances }
+  const result = []
+
+  for (let d = 1; d <= diasEnMes; d++) {
+    const fechaDia = `${anio}-${padMes}-${String(d).padStart(2,'0')}`
+    for (const m of (movsByDate[fechaDia] || [])) {
+      if (current[m.cuenta_id] !== undefined) current[m.cuenta_id] += m.delta
+    }
+    const entry = { dia: d }
+    let total = 0
+    for (const c of cuentasData) {
+      entry[c.id] = Math.round(current[c.id] || 0)
+      total += current[c.id] || 0
+    }
+    entry.total = Math.round(total)
+    result.push(entry)
+  }
+  return result
+}
+
+// Tooltip personalizado para el pie chart
+function PieTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: '#1a1b1e', border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: 10, padding: '8px 12px',
+    }}>
+      <p style={{ color: 'white', fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
+        {payload[0].name}
+      </p>
+      <p style={{ color: payload[0].fill, fontWeight: 600, fontSize: 12 }}>
+        {fmt(payload[0].value)}
+      </p>
+    </div>
+  )
+}
+
+// Tooltip para los gráficos de área
+function AreaTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: '#1a1b1e', border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: 8, padding: '6px 10px',
+    }}>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 3 }}>Día {label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color, fontWeight: 600, fontSize: 12 }}>{fmt(p.value)}</p>
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const { plan, loading: planLoading } = usePlan(user?.id)
-  const { nivel, racha, logrosDesbloqueados } = useGamificacion()
+  const { nivel, racha } = useGamificacion()
   const navigate = useNavigate()
 
   const now = new Date()
-  const [mes, setMes] = useState(now.getMonth() + 1)
+  const [mes, setMes]   = useState(now.getMonth() + 1)
   const [anio, setAnio] = useState(now.getFullYear())
-  const [gastos, setGastos] = useState([])
+
+  const [gastos, setGastos]   = useState([])
   const [ingresos, setIngresos] = useState([])
   const [presupuestoTotal, setPresupuestoTotal] = useState(0)
   const [presupuestosPorCategoria, setPresupuestosPorCategoria] = useState({})
   const [metaAhorro, setMetaAhorro] = useState(0)
+
+  const [cuentas, setCuentas]           = useState([])
+  const [evolucionData, setEvolucionData] = useState([])
+
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -47,18 +147,41 @@ export default function Dashboard() {
   async function fetchData() {
     setLoading(true)
     const { from, to } = getMonthRange(anio, mes)
-    const [gastosRes, ingresosRes, presupuestosRes] = await Promise.all([
-      supabase.from('gastos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
-      supabase.from('ingresos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
-      supabase.from('presupuestos').select('*').eq('user_id', user.id),
-    ])
-    setGastos(gastosRes.data || [])
-    setIngresos(ingresosRes.data || [])
+
+    const [gastosRes, ingresosRes, presupuestosRes, cuentasRes, gastosHistRes, ingresosHistRes] =
+      await Promise.all([
+        supabase.from('gastos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
+        supabase.from('ingresos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
+        supabase.from('presupuestos').select('*').eq('user_id', user.id),
+        supabase.from('cuentas').select('id, nombre, icono, saldo_inicial').eq('user_id', user.id).order('created_at'),
+        supabase.from('gastos').select('cuenta_id, monto, fecha').eq('user_id', user.id),
+        supabase.from('ingresos').select('cuenta_id, monto, fecha').eq('user_id', user.id),
+      ])
+
+    const gastosData   = gastosRes.data || []
+    const ingresosData = ingresosRes.data || []
+    setGastos(gastosData)
+    setIngresos(ingresosData)
+
     const presMap = {}
     for (const p of (presupuestosRes.data || [])) presMap[p.categoria] = p.limite_mensual
     setPresupuestoTotal(presMap['total'] || 0)
     setPresupuestosPorCategoria(presMap)
     setMetaAhorro(presMap['ahorro'] || 0)
+
+    const cuentasData = cuentasRes.data || []
+    setCuentas(cuentasData)
+
+    if (cuentasData.length > 0) {
+      const evol = computeEvolucion(
+        cuentasData,
+        gastosHistRes.data || [],
+        ingresosHistRes.data || [],
+        anio, mes,
+      )
+      setEvolucionData(evol)
+    }
+
     setLoading(false)
   }
 
@@ -74,9 +197,9 @@ export default function Dashboard() {
     )
   }
 
-  const totalGastado = gastos.reduce((acc, g) => acc + Number(g.monto), 0)
+  const totalGastado   = gastos.reduce((acc, g) => acc + Number(g.monto), 0)
   const totalIngresado = ingresos.reduce((acc, i) => acc + Number(i.monto), 0)
-  const balance = totalIngresado - totalGastado
+  const balance        = totalIngresado - totalGastado
   const pctPresupuesto = presupuestoTotal > 0 ? Math.min((totalGastado / presupuestoTotal) * 100, 100) : 0
 
   const gastosPorCategoria = gastos.reduce((acc, g) => {
@@ -137,13 +260,10 @@ export default function Dashboard() {
                   <span>{fmt(totalGastado)} / {fmt(presupuestoTotal)}</span>
                 </div>
                 <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-2 rounded-full transition-all"
-                    style={{
-                      width: `${pctPresupuesto}%`,
-                      background: pctPresupuesto >= 100 ? '#FA133A' : pctPresupuesto >= 80 ? '#F59E0B' : '#10B981'
-                    }}
-                  />
+                  <div className="h-2 rounded-full transition-all" style={{
+                    width: `${pctPresupuesto}%`,
+                    background: pctPresupuesto >= 100 ? '#FA133A' : pctPresupuesto >= 80 ? '#F59E0B' : '#10B981'
+                  }} />
                 </div>
                 {pctPresupuesto >= 100 && <p className="text-xs text-[#FA133A] mt-1.5">⛔ Superaste tu presupuesto mensual.</p>}
                 {pctPresupuesto >= 80 && pctPresupuesto < 100 && <p className="text-xs text-yellow-400 mt-1.5">⚠️ Llevás el {Math.round(pctPresupuesto)}% de tu presupuesto.</p>}
@@ -181,17 +301,10 @@ export default function Dashboard() {
 
             let mensaje, barColor
             if (esUltimoDia) {
-              if (balance >= metaAhorro) {
-                mensaje = '🏆 ¡Meta alcanzada! Cerrás el mes ahorrando ' + fmt(balance) + '.'
-                barColor = '#10B981'
-              } else {
-                mensaje = '❌ No llegaste a la meta. Te faltaron ' + fmt(falta) + '.'
-                barColor = '#FA133A'
-              }
+              if (balance >= metaAhorro) { mensaje = '🏆 ¡Meta alcanzada! Cerrás el mes ahorrando ' + fmt(balance) + '.'; barColor = '#10B981' }
+              else { mensaje = '❌ No llegaste a la meta. Te faltaron ' + fmt(falta) + '.'; barColor = '#FA133A' }
             } else if (esUltimaSemana) {
-              mensaje = balance >= metaAhorro
-                ? `💪 ¡Vas bien! Quedan ${diasRestantes} días — mantené el ritmo.`
-                : `⚠️ Quedan ${diasRestantes} días y te faltan ${fmt(falta)}.`
+              mensaje = balance >= metaAhorro ? `💪 ¡Vas bien! Quedan ${diasRestantes} días — mantené el ritmo.` : `⚠️ Quedan ${diasRestantes} días y te faltan ${fmt(falta)}.`
               barColor = balance >= metaAhorro ? '#10B981' : '#F59E0B'
             } else {
               if (pctAhorro >= 80) { mensaje = `🔥 ¡Vas muy bien! Llevás el ${Math.round(pctAhorro)}% de tu meta.`; barColor = '#10B981' }
@@ -214,7 +327,7 @@ export default function Dashboard() {
             )
           })()}
 
-          {/* Gastos por categoría */}
+          {/* Gastos por categoría — pie con tooltip arreglado */}
           {pieData.length > 0 && (
             <div className="card-dark p-4">
               <h2 className="text-white font-bold text-sm mb-4">Gastos por categoría</h2>
@@ -223,15 +336,12 @@ export default function Dashboard() {
                   <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={35}>
                     {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip
-                    formatter={(v) => fmt(v)}
-                    contentStyle={{ background: '#070708', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }}
-                  />
+                  <Tooltip content={<PieTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
 
               <div className="mt-3 space-y-2.5">
-                {[...pieData].sort((a, b) => b.value - a.value).map(({ name, value }, index) => {
+                {[...pieData].sort((a, b) => b.value - a.value).map(({ name, value }) => {
                   const pct = totalGastado > 0 ? (value / totalGastado) * 100 : 0
                   const color = COLORS[pieData.findIndex(p => p.name === name) % COLORS.length]
                   const limite = presupuestosPorCategoria[name]
@@ -260,6 +370,58 @@ export default function Dashboard() {
                   )
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Evolución de cuentas — gráficos de área */}
+          {evolucionData.length > 0 && cuentas.length > 0 && (
+            <div className="card-dark p-4 space-y-6">
+              <h2 className="text-white font-bold text-sm">Evolución de cuentas — {MESES[mes-1]}</h2>
+
+              {/* Total general */}
+              <div>
+                <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">Total general</p>
+                <ResponsiveContainer width="100%" height={130}>
+                  <AreaChart data={evolucionData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradTotal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#FA133A" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#FA133A" stopOpacity={0}    />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="dia" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tickFormatter={fmtShort} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
+                    <Tooltip content={<AreaTooltip />} />
+                    <Area type="monotone" dataKey="total" stroke="#FA133A" strokeWidth={2} fill="url(#gradTotal)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Una por cuenta */}
+              {cuentas.map((cuenta, idx) => {
+                const color = COLORS[idx % COLORS.length]
+                return (
+                  <div key={cuenta.id}>
+                    <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">
+                      {cuenta.icono} {cuenta.nombre}
+                    </p>
+                    <ResponsiveContainer width="100%" height={110}>
+                      <AreaChart data={evolucionData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor={color} stopOpacity={0.35} />
+                            <stop offset="95%" stopColor={color} stopOpacity={0}    />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="dia" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                        <YAxis tickFormatter={fmtShort} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} />
+                        <Tooltip content={<AreaTooltip />} />
+                        <Area type="monotone" dataKey={cuenta.id} stroke={color} strokeWidth={2} fill={`url(#grad-${idx})`} dot={false} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )
+              })}
             </div>
           )}
 
