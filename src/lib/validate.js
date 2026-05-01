@@ -1,5 +1,11 @@
 // Validation utilities — no external dependencies
 
+// Fecha local del dispositivo en formato AAAA-MM-DD (evita el bug de UTC con toISOString)
+export function localDateStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 export const isValidEmail = (email) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())
 

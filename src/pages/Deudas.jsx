@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { localDateStr } from '../lib/validate'
 
 function fmt(n) {
   return '$' + Number(n).toLocaleString('es-AR')
@@ -188,7 +189,7 @@ function FormDeuda({ onClose, onSave, tabInicial }) {
   const [persona, setPersona] = useState('')
   const [monto, setMonto] = useState('')
   const [descripcion, setDescripcion] = useState('')
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(localDateStr())
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e) {

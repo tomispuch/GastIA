@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { localDateStr } from '../lib/validate'
 
 const TIPOS = [
   { tipo: 'general',  label: 'General',           icono: '💰', color: '#6B7280' },
@@ -241,7 +242,7 @@ function FormTransferencia({ cuentas, userId, onClose, onSave }) {
   const [origenId, setOrigenId] = useState(cuentas[0]?.id || '')
   const [destinoId, setDestinoId] = useState(cuentas[1]?.id || '')
   const [monto, setMonto] = useState('')
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(localDateStr())
   const [descripcion, setDescripcion] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')

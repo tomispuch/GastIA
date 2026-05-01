@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { usePlan } from '../hooks/usePlan'
 import { useGamificacion } from '../context/GamificacionContext'
+import { localDateStr } from '../lib/validate'
 
 const MOCK_RESPONSE = {
   ok: true,
@@ -50,7 +51,7 @@ export default function Home() {
   const [cuentaId, setCuentaId] = useState('')
 
   const [texto, setTexto] = useState('')
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(localDateStr())
   const [listening, setListening] = useState(false)
   const [formLoading, setFormLoading] = useState(false)
   const [resultado, setResultado] = useState(null)
@@ -190,7 +191,7 @@ export default function Home() {
 
   function resetForm() {
     setTexto(''); setResultado(null); setFormError('')
-    setFecha(new Date().toISOString().split('T')[0])
+    setFecha(localDateStr())
   }
 
   const balance = totalIngresos - totalGastos
