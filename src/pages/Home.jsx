@@ -40,6 +40,7 @@ const ACCIONES = [
   { to: '/presupuestos',  label: 'Presupuestos',  desc: 'Límites por categoría',       icon: '🎯', plans: ['pro'],          color: '#F59E0B' },
   { to: '/comparativa',   label: 'Comparar',      desc: 'Compará dos meses',           icon: '📈', plans: ['pro'],          color: '#10B981' },
   { to: '/cuentas',       label: 'Cuentas',       desc: 'Tus billeteras y tarjetas',   icon: '💳', plans: ['pro'],          color: '#FA133A' },
+  { to: '/recurrentes',   label: 'Recurrentes',   desc: 'Gastos e ingresos fijos',     icon: '🔁', plans: ['gratis','pro'], color: '#10B981' },
   { to: '/deudas',        label: 'Deudas',        desc: 'Lo que debés y te deben',     icon: '🤝', plans: ['gratis','pro'], color: '#EC4899' },
   { to: '/logros',        label: 'Logros',        desc: 'Tu progreso y nivel',         icon: '🏆', plans: ['gratis','pro'], color: '#F97316' },
   { to: '/configuracion', label: 'Config',        desc: 'Ajustá tu cuenta',            icon: '⚙️', plans: ['gratis','pro'], color: '#6B7280' },

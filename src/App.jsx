@@ -21,6 +21,7 @@ const Logros        = lazy(() => import('./pages/Logros'))
 const Cuentas       = lazy(() => import('./pages/Cuentas'))
 const Soporte       = lazy(() => import('./pages/Soporte'))
 const Terminos      = lazy(() => import('./pages/Terminos'))
+const Recurrentes   = lazy(() => import('./pages/Recurrentes'))
 
 const Spinner = () => (
   <div className="flex items-center justify-center min-h-screen bg-[#D6D7D7]">
@@ -60,7 +61,8 @@ export default function App() {
           <Route path="/comparativa"  element={<Suspense fallback={<Spinner />}><Comparativa /></Suspense>} />
           <Route path="/logros"       element={<Suspense fallback={<Spinner />}><Logros /></Suspense>} />
           <Route path="/configuracion"element={<Suspense fallback={<Spinner />}><Configuracion /></Suspense>} />
-          <Route path="/soporte"      element={<Suspense fallback={<Spinner />}><Soporte /></Suspense>} />
+          <Route path="/soporte"       element={<Suspense fallback={<Spinner />}><Soporte /></Suspense>} />
+          <Route path="/recurrentes"  element={<Suspense fallback={<Spinner />}><Recurrentes /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

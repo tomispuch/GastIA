@@ -13,6 +13,7 @@ const navItems = [
   { to: '/presupuestos',  label: 'Presupuestos',  icon: '🎯', plans: ['pro'] },
   { to: '/comparativa',   label: 'Comparar',      icon: '📈', plans: ['pro'] },
   { to: '/cuentas',       label: 'Cuentas',       icon: '💳', plans: ['pro'] },
+  { to: '/recurrentes',   label: 'Recurrentes',   icon: '🔁', plans: ['gratis', 'pro'] },
   { to: '/deudas',        label: 'Deudas',        icon: '🤝', plans: ['gratis', 'pro'] },
   { to: '/logros',        label: 'Logros',        icon: '🏆', plans: ['gratis', 'pro'] },
   { to: '/configuracion', label: 'Config',        icon: '⚙️', plans: ['gratis', 'pro'] },
