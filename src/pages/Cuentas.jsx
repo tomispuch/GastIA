@@ -64,7 +64,8 @@ export default function Cuentas() {
     setConfirmDelete(null); fetchCuentas()
   }
 
-  const totalBalance = cuentas.reduce((a, c) => a + (c.balance || 0), 0)
+  const totalBalance = cuentas.filter(c => c.tipo !== 'ahorro').reduce((a, c) => a + (c.balance || 0), 0)
+  const totalAhorro  = cuentas.filter(c => c.tipo === 'ahorro').reduce((a, c) => a + (c.balance || 0), 0)
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
@@ -77,11 +78,17 @@ export default function Cuentas() {
 
       {/* Balance total */}
       <div className="card-dark p-5">
-        <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Balance total</p>
+        <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Balance disponible</p>
         <p className={`font-black text-3xl ${totalBalance >= 0 ? 'text-white' : 'text-[#FA133A]'}`}>
           {fmt(totalBalance)}
         </p>
         <p className="text-white/30 text-xs mt-1">{cuentas.length} cuenta{cuentas.length !== 1 ? 's' : ''}</p>
+        {totalAhorro > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/8 flex items-center justify-between">
+            <span className="text-white/40 text-xs">🏦 Ahorro acumulado</span>
+            <span className="text-[#F59E0B] font-bold text-sm">{fmt(totalAhorro)}</span>
+          </div>
+        )}
       </div>
 
       {loading ? (

@@ -12,6 +12,8 @@ function fmt(n) {
 export default function Presupuestos() {
   const { user } = useAuth()
   const { plan, loading: planLoading } = usePlan(user?.id)
+  const [cuentas, setCuentas] = useState([])
+  const [cuentaSeleccionada, setCuentaSeleccionada] = useState('')
   const [presupuestos, setPresupuestos] = useState({})
   const [gastosDelMes, setGastosDelMes] = useState({})
   const [loading, setLoading] = useState(true)
@@ -20,8 +22,15 @@ export default function Presupuestos() {
   useEffect(() => {
     if (!planLoading && plan !== 'pro') return
     if (!user) return
-    fetchData()
+    supabase.from('cuentas').select('id, nombre, icono, tipo').eq('user_id', user.id).order('created_at')
+      .then(({ data }) => setCuentas(data || []))
   }, [user, plan, planLoading])
+
+  useEffect(() => {
+    if (!planLoading && plan !== 'pro') return
+    if (!user) return
+    fetchData()
+  }, [user, plan, planLoading, cuentaSeleccionada])
 
   async function fetchData() {
     setLoading(true)
@@ -31,13 +40,24 @@ export default function Presupuestos() {
     const from = `${year}-${String(month).padStart(2,'0')}-01`
     const lastDay = new Date(year, month, 0).getDate()
     const to = `${year}-${String(month).padStart(2,'0')}-${lastDay}`
+
+    let gastosQ = supabase.from('gastos').select('categoria, monto').eq('user_id', user.id).gte('fecha', from).lte('fecha', to)
+    if (cuentaSeleccionada) gastosQ = gastosQ.eq('cuenta_id', cuentaSeleccionada)
+
     const [presRes, gastosRes] = await Promise.all([
       supabase.from('presupuestos').select('*').eq('user_id', user.id),
-      supabase.from('gastos').select('categoria, monto').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
+      gastosQ,
     ])
+
     const presMap = {}
-    for (const p of (presRes.data || [])) presMap[p.categoria] = { id: p.id, limite: p.limite_mensual }
+    for (const p of (presRes.data || [])) {
+      const pCuentaId = p.cuenta_id || ''
+      if (pCuentaId === cuentaSeleccionada) {
+        presMap[p.categoria] = { id: p.id, limite: p.limite_mensual }
+      }
+    }
     setPresupuestos(presMap)
+
     const gastosMap = {}
     for (const g of (gastosRes.data || [])) gastosMap[g.categoria] = (gastosMap[g.categoria] || 0) + Number(g.monto)
     setGastosDelMes(gastosMap)
@@ -51,7 +71,12 @@ export default function Presupuestos() {
     if (existing?.id) {
       await supabase.from('presupuestos').update({ limite_mensual: limiteNum }).eq('id', existing.id)
     } else {
-      await supabase.from('presupuestos').insert({ user_id: user.id, categoria, limite_mensual: limiteNum })
+      await supabase.from('presupuestos').insert({
+        user_id: user.id,
+        categoria,
+        limite_mensual: limiteNum,
+        cuenta_id: cuentaSeleccionada || null,
+      })
     }
     setSaving(null)
     fetchData()
@@ -70,10 +95,49 @@ export default function Presupuestos() {
   }
 
   const totalGastadoMes = Object.values(gastosDelMes).reduce((a, b) => a + b, 0)
+  const cuentaActual = cuentas.find(c => c.id === cuentaSeleccionada)
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-3">
       <h1 className="text-2xl font-black text-[#070708]">Presupuestos</h1>
+
+      {/* Selector de cuenta */}
+      {cuentas.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <button
+            onClick={() => setCuentaSeleccionada('')}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              cuentaSeleccionada === ''
+                ? 'bg-[#FA133A] text-white'
+                : 'bg-white/60 text-[#070708]/60 hover:bg-white/80'
+            }`}
+          >
+            Todas
+          </button>
+          {cuentas.filter(c => c.tipo !== 'ahorro').map(c => (
+            <button
+              key={c.id}
+              onClick={() => setCuentaSeleccionada(c.id)}
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                cuentaSeleccionada === c.id
+                  ? 'bg-[#FA133A] text-white'
+                  : 'bg-white/60 text-[#070708]/60 hover:bg-white/80'
+              }`}
+            >
+              <span>{c.icono}</span> {c.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {cuentaSeleccionada && cuentaActual && (
+        <p className="text-[#070708]/50 text-xs">
+          Presupuestos para <strong>{cuentaActual.icono} {cuentaActual.nombre}</strong>
+        </p>
+      )}
+      {!cuentaSeleccionada && (
+        <p className="text-[#070708]/50 text-xs">Presupuesto global — aplica a todas las cuentas</p>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -91,11 +155,13 @@ export default function Presupuestos() {
             highlight
           />
 
-          <MetaAhorro
-            meta={presupuestos['ahorro']?.limite || 0}
-            onSave={(v) => handleSave('ahorro', v)}
-            saving={saving === 'ahorro'}
-          />
+          {!cuentaSeleccionada && (
+            <MetaAhorro
+              meta={presupuestos['ahorro']?.limite || 0}
+              onSave={(v) => handleSave('ahorro', v)}
+              saving={saving === 'ahorro'}
+            />
+          )}
 
           <div className="space-y-2">
             {CATEGORIAS_GASTO.map(cat => (
@@ -121,11 +187,11 @@ function MetaAhorro({ meta, onSave, saving }) {
   const [valor, setValor] = useState(meta)
 
   return (
-    <div className="card-dark p-4" style={{ borderLeft: '3px solid #10B981' }}>
+    <div className="card-dark p-4" style={{ borderLeft: '3px solid #F59E0B' }}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-white font-semibold text-sm">🎯 Meta de ahorro mensual</p>
-          <p className="text-white/40 text-xs mt-0.5">Balance que querés tener al fin de mes</p>
+          <p className="text-white font-semibold text-sm">🏦 Meta de ahorro</p>
+          <p className="text-white/40 text-xs mt-0.5">Cuánto querés tener en tus cuentas de ahorro</p>
         </div>
         <div className="flex items-center gap-2">
           {editing ? (
@@ -148,7 +214,7 @@ function MetaAhorro({ meta, onSave, saving }) {
             </>
           ) : (
             <>
-              <span className="text-green-400 font-bold text-sm">{meta > 0 ? fmt(meta) : '—'}</span>
+              <span className="text-[#F59E0B] font-bold text-sm">{meta > 0 ? fmt(meta) : '—'}</span>
               <button
                 onClick={() => { setValor(meta); setEditing(true) }}
                 className="text-xs bg-white/10 hover:bg-white/15 text-white/60 px-3 py-1.5 rounded-lg transition-colors"

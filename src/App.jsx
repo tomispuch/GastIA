@@ -20,6 +20,7 @@ const Comparativa   = lazy(() => import('./pages/Comparativa'))
 const Logros        = lazy(() => import('./pages/Logros'))
 const Cuentas       = lazy(() => import('./pages/Cuentas'))
 const Soporte       = lazy(() => import('./pages/Soporte'))
+const Terminos      = lazy(() => import('./pages/Terminos'))
 
 const Spinner = () => (
   <div className="flex items-center justify-center min-h-screen bg-[#D6D7D7]">
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/registro" element={<PublicRoute><Registro /></PublicRoute>} />
+        <Route path="/terminos" element={<Suspense fallback={<Spinner />}><Terminos /></Suspense>} />
         <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route path="/home" element={<Home />} />
           <Route path="/historial"    element={<Suspense fallback={<Spinner />}><Historial /></Suspense>} />

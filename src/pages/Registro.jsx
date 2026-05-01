@@ -62,6 +62,19 @@ export default function Registro() {
       return
     }
 
+    if (data.user) {
+      try {
+        await supabase.from('cuentas').insert({
+          user_id: data.user.id,
+          nombre: 'General',
+          tipo: 'general',
+          icono: '💰',
+          color: '#6B7280',
+          saldo_inicial: 0,
+        })
+      } catch { /* ignorar errores silenciosamente */ }
+    }
+
     setLoading(false)
     navigate('/home')
   }
@@ -163,6 +176,12 @@ export default function Registro() {
               ¿Ya tenés cuenta?{' '}
               <Link to="/login" className="font-semibold text-[#FA133A] hover:text-red-700">
                 Iniciar sesión
+              </Link>
+            </p>
+            <p className="text-center text-xs text-gray-400">
+              Al registrarte aceptás los{' '}
+              <Link to="/terminos" className="underline hover:text-gray-600">
+                Términos y condiciones
               </Link>
             </p>
           </form>

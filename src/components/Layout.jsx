@@ -186,6 +186,9 @@ export default function Layout() {
             />
           </a>
           <p className="text-[#070708]/40 text-xs font-medium">TRS Automatizaciones</p>
+          <a href="/terminos" className="text-[#070708]/40 text-xs hover:text-[#FA133A] transition-colors underline">
+            Términos y condiciones
+          </a>
         </div>
       </main>
 

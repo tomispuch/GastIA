@@ -33,17 +33,15 @@ function getMonthRange(year, month) {
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 // Calcula la evolución diaria de saldos para el mes dado
-function computeEvolucion(cuentasData, gastosHist, ingresosHist, anio, mes) {
+// Las cuentas tipo 'ahorro' se excluyen del total general
+function computeEvolucion(cuentasData, gastosHist, ingresosHist, transHist, anio, mes) {
   const diasEnMes = new Date(anio, mes, 0).getDate()
   const padMes = String(mes).padStart(2, '0')
   const fechaInicioMes = `${anio}-${padMes}-01`
 
-  // Saldo inicial de cada cuenta
   const balances = {}
   for (const c of cuentasData) balances[c.id] = Number(c.saldo_inicial)
 
-  // Agrupar movimientos: los anteriores al mes se acumulan directo,
-  // los del mes se indexan por fecha
   const movsByDate = {}
 
   for (const g of gastosHist) {
@@ -62,6 +60,16 @@ function computeEvolucion(cuentasData, gastosHist, ingresosHist, anio, mes) {
       movsByDate[i.fecha].push({ cuenta_id: i.cuenta_id, delta: Number(i.monto) })
     }
   }
+  for (const t of transHist) {
+    if (t.fecha < fechaInicioMes) {
+      if (balances[t.cuenta_origen_id] !== undefined) balances[t.cuenta_origen_id] -= Number(t.monto)
+      if (balances[t.cuenta_destino_id] !== undefined) balances[t.cuenta_destino_id] += Number(t.monto)
+    } else {
+      if (!movsByDate[t.fecha]) movsByDate[t.fecha] = []
+      movsByDate[t.fecha].push({ cuenta_id: t.cuenta_origen_id, delta: -Number(t.monto) })
+      movsByDate[t.fecha].push({ cuenta_id: t.cuenta_destino_id, delta: Number(t.monto) })
+    }
+  }
 
   const current = { ...balances }
   const result = []
@@ -75,7 +83,7 @@ function computeEvolucion(cuentasData, gastosHist, ingresosHist, anio, mes) {
     let total = 0
     for (const c of cuentasData) {
       entry[c.id] = Math.round(current[c.id] || 0)
-      total += current[c.id] || 0
+      if (c.tipo !== 'ahorro') total += current[c.id] || 0
     }
     entry.total = Math.round(total)
     result.push(entry)
@@ -133,8 +141,9 @@ export default function Dashboard() {
   const [presupuestosPorCategoria, setPresupuestosPorCategoria] = useState({})
   const [metaAhorro, setMetaAhorro] = useState(0)
 
-  const [cuentas, setCuentas]           = useState([])
-  const [evolucionData, setEvolucionData] = useState([])
+  const [cuentas, setCuentas]               = useState([])
+  const [evolucionData, setEvolucionData]   = useState([])
+  const [transferenciasMes, setTransferenciasMes] = useState([])
 
   const [loading, setLoading] = useState(true)
 
@@ -148,20 +157,23 @@ export default function Dashboard() {
     setLoading(true)
     const { from, to } = getMonthRange(anio, mes)
 
-    const [gastosRes, ingresosRes, presupuestosRes, cuentasRes, gastosHistRes, ingresosHistRes] =
+    const [gastosRes, ingresosRes, presupuestosRes, cuentasRes, gastosHistRes, ingresosHistRes, transHistRes, transMesRes] =
       await Promise.all([
         supabase.from('gastos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
         supabase.from('ingresos').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
         supabase.from('presupuestos').select('*').eq('user_id', user.id),
-        supabase.from('cuentas').select('id, nombre, icono, saldo_inicial').eq('user_id', user.id).order('created_at'),
+        supabase.from('cuentas').select('id, nombre, icono, tipo, saldo_inicial').eq('user_id', user.id).order('created_at'),
         supabase.from('gastos').select('cuenta_id, monto, fecha').eq('user_id', user.id),
         supabase.from('ingresos').select('cuenta_id, monto, fecha').eq('user_id', user.id),
+        supabase.from('transferencias').select('cuenta_origen_id, cuenta_destino_id, monto, fecha').eq('user_id', user.id),
+        supabase.from('transferencias').select('*').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
       ])
 
     const gastosData   = gastosRes.data || []
     const ingresosData = ingresosRes.data || []
     setGastos(gastosData)
     setIngresos(ingresosData)
+    setTransferenciasMes(transMesRes.data || [])
 
     const presMap = {}
     for (const p of (presupuestosRes.data || [])) presMap[p.categoria] = p.limite_mensual
@@ -177,6 +189,7 @@ export default function Dashboard() {
         cuentasData,
         gastosHistRes.data || [],
         ingresosHistRes.data || [],
+        transHistRes.data || [],
         anio, mes,
       )
       setEvolucionData(evol)
@@ -211,7 +224,12 @@ export default function Dashboard() {
   const ultimosMovimientos = [
     ...gastos.map(g => ({ ...g, _tipo: 'gasto' })),
     ...ingresos.map(i => ({ ...i, _tipo: 'ingreso' })),
+    ...transferenciasMes.map(t => ({ ...t, _tipo: 'transferencia', categoria: 'Transferencia' })),
   ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 5)
+
+  const ahorroAccounts = cuentas.filter(c => c.tipo === 'ahorro')
+  const lastEvol = evolucionData.at(-1) || {}
+  const ahorroBalance = ahorroAccounts.reduce((sum, c) => sum + (lastEvol[c.id] || 0), 0)
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
@@ -295,29 +313,29 @@ export default function Dashboard() {
             const diasDelMes = new Date(anio, mes, 0).getDate()
             const esUltimoDia = esMesActual && now2.getDate() === diasDelMes
             const esUltimaSemana = esMesActual && now2.getDate() >= diasDelMes - 6
-            const pctAhorro = metaAhorro > 0 ? Math.min((balance / metaAhorro) * 100, 100) : 0
-            const falta = metaAhorro - balance
+            const pctAhorro = metaAhorro > 0 ? Math.min((ahorroBalance / metaAhorro) * 100, 100) : 0
+            const falta = metaAhorro - ahorroBalance
             const diasRestantes = esMesActual ? diasDelMes - now2.getDate() : 0
 
             let mensaje, barColor
             if (esUltimoDia) {
-              if (balance >= metaAhorro) { mensaje = '🏆 ¡Meta alcanzada! Cerrás el mes ahorrando ' + fmt(balance) + '.'; barColor = '#10B981' }
+              if (ahorroBalance >= metaAhorro) { mensaje = '🏆 ¡Meta alcanzada! Ahorraste ' + fmt(ahorroBalance) + '.'; barColor = '#10B981' }
               else { mensaje = '❌ No llegaste a la meta. Te faltaron ' + fmt(falta) + '.'; barColor = '#FA133A' }
             } else if (esUltimaSemana) {
-              mensaje = balance >= metaAhorro ? `💪 ¡Vas bien! Quedan ${diasRestantes} días — mantené el ritmo.` : `⚠️ Quedan ${diasRestantes} días y te faltan ${fmt(falta)}.`
-              barColor = balance >= metaAhorro ? '#10B981' : '#F59E0B'
+              mensaje = ahorroBalance >= metaAhorro ? `💪 ¡Vas bien! Quedan ${diasRestantes} días — mantené el ritmo.` : `⚠️ Quedan ${diasRestantes} días y te faltan ${fmt(falta)}.`
+              barColor = ahorroBalance >= metaAhorro ? '#10B981' : '#F59E0B'
             } else {
               if (pctAhorro >= 80) { mensaje = `🔥 ¡Vas muy bien! Llevás el ${Math.round(pctAhorro)}% de tu meta.`; barColor = '#10B981' }
               else if (pctAhorro >= 50) { mensaje = `👍 Llevás el ${Math.round(pctAhorro)}% — seguí así.`; barColor = '#F59E0B' }
               else if (pctAhorro >= 20) { mensaje = `📊 Llevás el ${Math.round(pctAhorro)}% de tu meta. Ojo con los gastos.`; barColor = '#6B7280' }
-              else { mensaje = `🚀 Cada peso que no gastás te acerca a tu meta de ${fmt(metaAhorro)}.`; barColor = '#6B7280' }
+              else { mensaje = `🚀 Cada peso que depositás en ahorro te acerca a tu meta de ${fmt(metaAhorro)}.`; barColor = '#6B7280' }
             }
 
             return (
               <div className="card-dark p-4">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-white font-semibold text-sm">🎯 Meta de ahorro</span>
-                  <span className="text-white/40 text-xs">{fmt(Math.max(balance, 0))} / {fmt(metaAhorro)}</span>
+                  <span className="text-white/40 text-xs">{fmt(Math.max(ahorroBalance, 0))} / {fmt(metaAhorro)}</span>
                 </div>
                 <div className="w-full bg-white/10 rounded-full h-2.5 overflow-hidden mb-3">
                   <div className="h-2.5 rounded-full transition-all" style={{ width: `${Math.max(pctAhorro, 0)}%`, background: barColor }} />
@@ -435,22 +453,31 @@ export default function Dashboard() {
               <p className="text-white/30 text-sm text-center py-4">Sin movimientos este mes.</p>
             ) : (
               <div className="space-y-3">
-                {ultimosMovimientos.map(item => (
-                  <div key={`${item._tipo}-${item.id}`} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs ${item._tipo === 'gasto' ? 'bg-[#FA133A]/15 text-[#FA133A]' : 'bg-green-500/15 text-green-400'}`}>
-                        {item._tipo === 'gasto' ? '↓' : '↑'}
+                {ultimosMovimientos.map(item => {
+                  const esTrans = item._tipo === 'transferencia'
+                  return (
+                    <div key={`${item._tipo}-${item.id}`} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs ${
+                          esTrans ? 'bg-blue-500/15 text-blue-400' :
+                          item._tipo === 'gasto' ? 'bg-[#FA133A]/15 text-[#FA133A]' : 'bg-green-500/15 text-green-400'
+                        }`}>
+                          {esTrans ? '↔' : item._tipo === 'gasto' ? '↓' : '↑'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-white text-xs font-medium truncate">{item.descripcion || item.categoria}</p>
+                          <p className="text-white/30 text-xs">{item.fecha}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-white text-xs font-medium truncate">{item.descripcion || item.categoria}</p>
-                        <p className="text-white/30 text-xs">{item.fecha}</p>
-                      </div>
+                      <span className={`font-bold text-sm flex-shrink-0 ml-3 ${
+                        esTrans ? 'text-blue-400' :
+                        item._tipo === 'gasto' ? 'text-[#FA133A]' : 'text-green-400'
+                      }`}>
+                        {!esTrans && (item._tipo === 'ingreso' ? '+' : '-')}{fmt(item.monto)}
+                      </span>
                     </div>
-                    <span className={`font-bold text-sm flex-shrink-0 ml-3 ${item._tipo === 'gasto' ? 'text-[#FA133A]' : 'text-green-400'}`}>
-                      {item._tipo === 'ingreso' ? '+' : '-'}{fmt(item.monto)}
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

@@ -16,6 +16,13 @@ const speechSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognitio
 
 function fmt(n) { return '$' + Number(n).toLocaleString('es-AR') }
 
+function fmtShort(n) {
+  const abs = Math.abs(n)
+  const s = n < 0 ? '-' : ''
+  if (abs >= 1_000_000) return s + '$' + (abs / 1_000_000).toFixed(1) + 'M'
+  return '$' + Number(n).toLocaleString('es-AR')
+}
+
 function getMonthRange() {
   const now = new Date()
   const y = now.getFullYear(), m = now.getMonth() + 1
@@ -220,16 +227,16 @@ export default function Home() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-white/40 text-xs mb-1">Gastado</p>
-              <p className="text-[#FA133A] font-black text-xl leading-tight">{fmt(totalGastos)}</p>
+              <p className="text-[#FA133A] font-black text-xl leading-tight">{fmtShort(totalGastos)}</p>
             </div>
             <div>
               <p className="text-white/40 text-xs mb-1">Ingresado</p>
-              <p className="text-green-400 font-black text-xl leading-tight">{fmt(totalIngresos)}</p>
+              <p className="text-green-400 font-black text-xl leading-tight">{fmtShort(totalIngresos)}</p>
             </div>
             <div>
               <p className="text-white/40 text-xs mb-1">Balance</p>
               <p className={`font-black text-xl leading-tight ${balance >= 0 ? 'text-green-400' : 'text-[#FA133A]'}`}>
-                {fmt(balance)}
+                {fmtShort(balance)}
               </p>
             </div>
           </div>
@@ -253,7 +260,7 @@ export default function Home() {
                   <p className="text-white/60 text-xs font-medium truncate">{c.nombre}</p>
                 </div>
                 <p className={`font-black text-base ${c.balance >= 0 ? 'text-white' : 'text-[#FA133A]'}`}>
-                  {fmt(c.balance || 0)}
+                  {fmtShort(c.balance || 0)}
                 </p>
               </div>
             ))}
