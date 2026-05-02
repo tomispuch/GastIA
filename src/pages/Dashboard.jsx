@@ -23,6 +23,13 @@ function fmtShort(n) {
   return '$' + n
 }
 
+function fmtBig(n) {
+  const abs = Math.abs(n)
+  const s = n < 0 ? '-' : ''
+  if (abs >= 1_000_000) return s + '$' + (abs / 1_000_000).toFixed(1) + 'M'
+  return '$' + Number(n).toLocaleString('es-AR')
+}
+
 function getMonthRange(year, month) {
   const from = `${year}-${String(month).padStart(2,'0')}-01`
   const lastDay = new Date(year, month, 0).getDate()
@@ -259,15 +266,15 @@ export default function Dashboard() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-white/40 text-xs mb-1">Gastado</p>
-                <p className="text-[#FA133A] font-black text-xl leading-tight">{fmt(totalGastado)}</p>
+                <p className="text-[#FA133A] font-black text-xl leading-tight">{fmtBig(totalGastado)}</p>
               </div>
               <div>
                 <p className="text-white/40 text-xs mb-1">Ingresado</p>
-                <p className="text-green-400 font-black text-xl leading-tight">{fmt(totalIngresado)}</p>
+                <p className="text-green-400 font-black text-xl leading-tight">{fmtBig(totalIngresado)}</p>
               </div>
               <div>
                 <p className="text-white/40 text-xs mb-1">Balance</p>
-                <p className={`font-black text-xl leading-tight ${balance >= 0 ? 'text-green-400' : 'text-[#FA133A]'}`}>{fmt(balance)}</p>
+                <p className={`font-black text-xl leading-tight ${balance >= 0 ? 'text-green-400' : 'text-[#FA133A]'}`}>{fmtBig(balance)}</p>
               </div>
             </div>
 
