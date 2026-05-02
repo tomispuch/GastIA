@@ -24,8 +24,8 @@ const Terminos      = lazy(() => import('./pages/Terminos'))
 const Recurrentes   = lazy(() => import('./pages/Recurrentes'))
 
 const Spinner = () => (
-  <div className="flex items-center justify-center min-h-screen bg-[#D6D7D7]">
-    <div className="w-8 h-8 rounded-full border-2 border-[#FA133A] border-t-transparent animate-spin" />
+  <div className="rsk-spinner-wrap">
+    <div className="rsk-spinner" />
   </div>
 )
 

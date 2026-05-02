@@ -12,12 +12,34 @@
     <meta name="apple-mobile-web-app-title" content="GastIA" />
     <link rel="manifest" href="/manifest.json" />
     <title>GastIA - Gestor de gastos</title>
+    <!-- Google Fonts como link (no @import) para no bloquear el CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
       html, body {
         background: #070708;
         min-height: 100%;
+      }
+
+      /* Spinner CSS-independiente para que funcione antes de que cargue Tailwind */
+      @keyframes rsk-spin { to { transform: rotate(360deg); } }
+      .rsk-spinner-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100svh;
+        background: #D6D7D7;
+      }
+      .rsk-spinner {
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        border: 2.5px solid rgba(250,19,58,0.25);
+        border-top-color: #FA133A;
+        animation: rsk-spin 0.75s linear infinite;
+        flex-shrink: 0;
       }
 
       /* ── Shimmer animation ── */
