@@ -23,16 +23,7 @@ function fmtShort(n) {
   return '$' + Number(n).toLocaleString('es-AR')
 }
 
-function getMonthRange() {
-  const now = new Date()
-  const y = now.getFullYear(), m = now.getMonth() + 1
-  return {
-    from: `${y}-${String(m).padStart(2,'0')}-01`,
-    to: `${y}-${String(m).padStart(2,'0')}-${new Date(y, m, 0).getDate()}`,
-  }
-}
 
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const ACCIONES = [
   { to: '/historial',     label: 'Historial',     desc: 'Todos tus movimientos',       icon: '📋', plans: ['gratis','pro'], color: '#3B82F6' },
@@ -52,6 +43,7 @@ export default function Home() {
   const { nivel, racha, logrosDesbloqueados, verificarPrimerGasto } = useGamificacion()
   const navigate = useNavigate()
 
+  const [metaAhorro, setMetaAhorro] = useState(0)
   const [totalGastos, setTotalGastos] = useState(0)
   const [totalIngresos, setTotalIngresos] = useState(0)
   const [resumenLoading, setResumenLoading] = useState(true)
@@ -66,19 +58,22 @@ export default function Home() {
   const [formError, setFormError] = useState('')
   const recognitionRef = useRef(null)
 
-  const now = new Date()
-
   const fetchData = useCallback(async () => {
     if (!user) return
     setResumenLoading(true)
-    const { from, to } = getMonthRange()
-    const [gRes, iRes, cRes] = await Promise.all([
+    const now = new Date()
+    const y = now.getFullYear(), mo = now.getMonth() + 1
+    const from = `${y}-${String(mo).padStart(2,'0')}-01`
+    const to = `${y}-${String(mo).padStart(2,'0')}-${new Date(y, mo, 0).getDate()}`
+    const [gRes, iRes, cRes, presRes] = await Promise.all([
       supabase.from('gastos').select('monto').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
       supabase.from('ingresos').select('monto').eq('user_id', user.id).gte('fecha', from).lte('fecha', to),
       supabase.from('cuentas').select('*').eq('user_id', user.id).order('created_at'),
+      supabase.from('presupuestos').select('limite_mensual').eq('user_id', user.id).eq('categoria', 'ahorro').is('cuenta_id', null).maybeSingle(),
     ])
     setTotalGastos((gRes.data || []).reduce((a, g) => a + Number(g.monto), 0))
     setTotalIngresos((iRes.data || []).reduce((a, i) => a + Number(i.monto), 0))
+    setMetaAhorro(presRes.data?.limite_mensual || 0)
 
     if (cRes.data?.length) {
       // calcular balances
@@ -202,7 +197,8 @@ export default function Home() {
     setFecha(localDateStr())
   }
 
-  const balance = totalIngresos - totalGastos
+  const disponible = cuentas.filter(c => c.tipo !== 'ahorro').reduce((a, c) => a + (c.balance || 0), 0)
+  const ahorrado = cuentas.filter(c => c.tipo === 'ahorro').reduce((a, c) => a + (c.balance || 0), 0)
   const nombreUsuario = user?.user_metadata?.nombre || user?.email?.split('@')[0] || 'Usuario'
   const mostrarSelectorCuenta = cuentas.length > 1
 
@@ -215,30 +211,48 @@ export default function Home() {
         <h1 className="text-3xl font-black text-[#070708] leading-tight">{nombreUsuario}</h1>
       </div>
 
-      {/* Resumen del mes */}
+      {/* Balance actual */}
       <div className="card-dark p-5">
-        <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-4">
-          {MESES[now.getMonth()]} {now.getFullYear()}
-        </p>
+        <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-4">Balance actual</p>
         {resumenLoading ? (
           <div className="flex justify-center py-3">
             <div className="w-5 h-5 rounded-full border-2 border-[#FA133A] border-t-transparent animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-white/40 text-xs mb-1">Gastado</p>
-              <p className="text-[#FA133A] font-black text-xl leading-tight">{fmtShort(totalGastos)}</p>
+          <div className="space-y-4">
+            {/* Fila principal */}
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1.5">Disponible</p>
+                <p className={`font-black text-2xl leading-tight ${disponible >= 0 ? 'text-white' : 'text-[#FA133A]'}`}>
+                  {fmtShort(disponible)}
+                </p>
+              </div>
+              <div>
+                <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1.5">Ahorrado</p>
+                <p className={`font-black text-2xl leading-tight ${
+                  metaAhorro > 0
+                    ? (ahorrado >= metaAhorro ? 'text-green-400' : 'text-[#FA133A]')
+                    : 'text-[#F59E0B]'
+                }`}>{fmtShort(ahorrado)}</p>
+                {metaAhorro > 0 && (
+                  <p className="text-white/25 text-xs mt-1">
+                    {Math.round(Math.min((ahorrado / metaAhorro) * 100, 100))}% de tu meta
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-white/40 text-xs mb-1">Ingresado</p>
-              <p className="text-green-400 font-black text-xl leading-tight">{fmtShort(totalIngresos)}</p>
-            </div>
-            <div>
-              <p className="text-white/40 text-xs mb-1">Balance</p>
-              <p className={`font-black text-xl leading-tight ${balance >= 0 ? 'text-green-400' : 'text-[#FA133A]'}`}>
-                {fmtShort(balance)}
-              </p>
+            {/* Fila secundaria */}
+            <div className="flex items-center gap-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-white/30 text-xs">Ingresado</span>
+                <span className="text-green-400 font-semibold text-xs">{fmtShort(totalIngresos)}</span>
+              </div>
+              <div className="w-px h-3 bg-white/15 flex-shrink-0" />
+              <div className="flex items-center gap-2">
+                <span className="text-white/30 text-xs">Gastado</span>
+                <span className="text-[#FA133A] font-semibold text-xs">{fmtShort(totalGastos)}</span>
+              </div>
             </div>
           </div>
         )}

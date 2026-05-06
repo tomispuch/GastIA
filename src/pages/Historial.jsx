@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { usePlan } from '../hooks/usePlan'
-import ImportarExcel from '../components/ImportarExcel'
 
 const CATEGORIAS_GASTO = ['Comida y bebida','Transporte','Salud','Vivienda','Entretenimiento','Ropa e indumentaria','Educación','Tecnología','Viajes','Impuesto','Otros']
 const CATEGORIAS_INGRESO = ['Sueldo','Freelance','Venta','Inversiones','Regalo','Otro']
@@ -34,7 +33,6 @@ export default function Historial() {
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [showImport, setShowImport] = useState(false)
 
   useEffect(() => {
     if (!user || !plan) return
@@ -86,6 +84,39 @@ export default function Historial() {
     fetchMovimientos()
   }
 
+  function handleExport() {
+    const headers = ['Tipo', 'Fecha', 'Monto', 'Categoría', 'Descripción', 'Cuenta']
+    const rows = movimientos.map(m => {
+      let cuentaLabel = ''
+      if (m._tipo === 'transferencia') {
+        const ori = cuentas.find(c => c.id === m.cuenta_origen_id)
+        const dest = cuentas.find(c => c.id === m.cuenta_destino_id)
+        cuentaLabel = ori && dest ? `${ori.nombre} → ${dest.nombre}` : ''
+      } else {
+        const c = cuentas.find(ct => ct.id === m.cuenta_id)
+        cuentaLabel = c?.nombre || ''
+      }
+      return [
+        m._tipo === 'transferencia' ? 'Transferencia' : m._tipo === 'gasto' ? 'Gasto' : 'Ingreso',
+        m.fecha,
+        m.monto,
+        m.categoria || '',
+        m.descripcion || '',
+        cuentaLabel,
+      ]
+    })
+    const csv = [headers, ...rows]
+      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `gastia-${anio}-${String(mes).padStart(2, '0')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const totalGastos = movimientos.filter(m => m._tipo === 'gasto').reduce((a, m) => a + Number(m.monto), 0)
   const totalIngresos = movimientos.filter(m => m._tipo === 'ingreso').reduce((a, m) => a + Number(m.monto), 0)
 
@@ -94,16 +125,17 @@ export default function Historial() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-black text-[#070708]">Historial</h1>
         <button
-          onClick={() => setShowImport(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all"
+          onClick={handleExport}
+          disabled={movimientos.length === 0}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
           style={{ background: 'rgba(250,19,58,0.08)', color: '#FA133A', border: '1px solid rgba(250,19,58,0.2)' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(250,19,58,0.15)'}
+          onMouseEnter={e => !e.currentTarget.disabled && (e.currentTarget.style.background = 'rgba(250,19,58,0.15)')}
           onMouseLeave={e => e.currentTarget.style.background = 'rgba(250,19,58,0.08)'}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
           </svg>
-          Importar Excel
+          Exportar
         </button>
       </div>
 
@@ -254,12 +286,6 @@ export default function Historial() {
         <EditModal item={editando} onClose={() => setEditando(null)} onSave={fd => handleEdit(editando, fd)} />
       )}
 
-      {showImport && (
-        <ImportarExcel
-          onClose={() => setShowImport(false)}
-          onImportComplete={fetchMovimientos}
-        />
-      )}
     </div>
   )
 }
